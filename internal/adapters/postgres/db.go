@@ -18,6 +18,7 @@ func NewDB(databaseURL string) (*DB, error) {
 	}
 
 	if err := db.Ping(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping db: %w", err)
 	}
 

@@ -126,7 +126,13 @@ func (r *ItemRepo) MarkResyncing(ctx context.Context, id uuid.UUID) error {
 }
 
 func (r *ItemRepo) MarkError(ctx context.Context, id uuid.UUID, syncErr error) error {
-	errText := syncErr.Error()
+	var errText string
+	if syncErr != nil {
+		errText = syncErr.Error()
+	} else {
+		errText = "unknown error"
+	}
+	
 	query := `
 		UPDATE items 
 		SET sync_status = 'error', 

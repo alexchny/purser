@@ -9,8 +9,7 @@ import (
 )
 
 type DistributedLock interface {
-	Acquire(ctx context.Context, key string, ttl time.Duration) (bool, error)
-	Release(ctx context.Context, key string) error
+	Acquire(ctx context.Context, key string, ttl time.Duration) (release func() error, err error)
 }
 
 type EventPublisher interface {

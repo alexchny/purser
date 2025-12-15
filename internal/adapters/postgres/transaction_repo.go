@@ -26,21 +26,19 @@ func (r *TransactionRepo) UpsertBatch(ctx context.Context, txs []*domain.Transac
 	values := []interface{}{}
 	placeholders := []string{}
 
-	const paramsPerTx = 10
+	const paramsPerTx = 9
 
 	for i, tx := range txs {
-		// build query params
 		base := i * paramsPerTx
 		
 		row := fmt.Sprintf(
-			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			"(gen_random_uuid(), $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, NOW(), NOW())",
 			base+1, base+2, base+3, base+4, base+5, 
-			base+6, base+7, base+8, base+9, base+10,
+			base+6, base+7, base+8, base+9,
 		)
 		placeholders = append(placeholders, row)
 
 		values = append(values,
-			tx.ID,
 			tx.ItemID,
 			tx.PlaidTransactionID,
 			tx.PlaidPendingID,
@@ -59,13 +57,15 @@ func (r *TransactionRepo) UpsertBatch(ctx context.Context, txs []*domain.Transac
 			item_id, 
 			plaid_transaction_id, 
 			plaid_pending_id,
-			amount_cents, 
-			currency_code, 
-			date, 
+			amount_cents,
+			currency_code,
+			date,
 			merchant_name,
 			status,
-			raw_payload
-		) 
+			raw_payload,
+			created_at,
+			updated_at
+		)
 		VALUES %s
 		ON CONFLICT (plaid_transaction_id) DO UPDATE SET
 			amount_cents = EXCLUDED.amount_cents,

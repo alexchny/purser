@@ -38,3 +38,16 @@ vendor/
 
 dist/
 build/
+
+api
+worker
+
+docker-compose.dev.yml
+Makefile
+scripts/
+
+dump.rdb
+*.rdb
+
+*.log
+logs/

@@ -25,7 +25,7 @@ func NewClient(addr string, password string, db int) (*Client, error) {
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
-	
+
 	return &Client{rdb: rdb}, nil
 }
 

@@ -1,0 +1,102 @@
+services:
+  # 1. DATABASE
+  postgres:
+    image: postgres:15-alpine
+    container_name: sync-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: sync_relay
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # 2. MIGRATOR (Runs once to apply schema)
+  migrator:
+    image: migrate/migrate
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command:
+      - -path=/migrations
+      - -database=postgres://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/sync_relay?sslmode=disable
+      - up
+
+  # 3. REDIS
+  redis:
+    image: redis:7-alpine
+    container_name: sync-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # 4. API SERVICE
+  api:
+    build: .
+    command: /app/api
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+      - PORT=8080
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/sync_relay?sslmode=disable
+      - REDIS_ADDR=redis:6379
+      - REDIS_DB=0
+      - PLAID_CLIENT_ID=${PLAID_CLIENT_ID}
+      - PLAID_SECRET=${PLAID_SECRET}
+      - PLAID_ENV=${PLAID_ENV:-sandbox}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # 5. WORKER SERVICE
+  worker:
+    build: .
+    command: /app/worker
+    environment:
+      - APP_ENV=production
+      - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-3}
+      - LOCK_TTL=${LOCK_TTL:-2m}
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/sync_relay?sslmode=disable
+      - REDIS_ADDR=redis:6379
+      - REDIS_DB=0
+      - PLAID_CLIENT_ID=${PLAID_CLIENT_ID}
+      - PLAID_SECRET=${PLAID_SECRET}
+      - PLAID_ENV=${PLAID_ENV:-sandbox}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+

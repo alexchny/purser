@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -61,6 +62,26 @@ func (h *AccountHandler) ConnectItem(w http.ResponseWriter, r *http.Request) {
 
 	itemID, err := h.service.LinkItem(r.Context(), tenantID, req.PublicToken)
 	if err != nil {
+		// token already used
+		if errors.Is(err, service.ErrTokenAlreadyUsed) {
+			slog.Info("token already used", "tenant_id", tenantID)
+			http.Error(w, "this connection is already being processed", http.StatusConflict)
+			return
+		}
+
+		// item already linked
+		if errors.Is(err, service.ErrItemAlreadyLinked) {
+			slog.Info("item already linked, returning existing", "item_id", itemID, "tenant_id", tenantID)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"item_id": itemID.String(),
+				"status":  "already_linked",
+			})
+			return
+		}
+
+		// other errors
 		slog.Error("failed to connect item", "tenant_id", tenantID, "error", err)
 		http.Error(w, "failed to connect item", http.StatusInternalServerError)
 		return

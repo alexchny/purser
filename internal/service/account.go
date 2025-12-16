@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/alexchny/sync-relay/internal/ports"
 	"github.com/google/uuid"
 )
+
+var ErrTokenAlreadyUsed = errors.New("public token already used")
+var ErrItemAlreadyLinked = errors.New("item already linked")
 
 type AccountService struct {
 	plaidClient ports.PlaidClient
@@ -31,6 +35,10 @@ func (s *AccountService) CreateLinkToken(ctx context.Context, userID string) (st
 func (s *AccountService) LinkItem(ctx context.Context, tenantID uuid.UUID, publicToken string) (uuid.UUID, error) {
 	tokenResp, err := s.plaidClient.ExchangePublicToken(ctx, publicToken)
 	if err != nil {
+		if errors.Is(err, ports.ErrInvalidToken) {
+			slog.Info("public token already used or invalid", "tenant_id", tenantID)
+			return uuid.Nil, ErrTokenAlreadyUsed
+		}
 		return uuid.Nil, fmt.Errorf("token exchange failed: %w", err)
 	}
 
@@ -45,6 +53,17 @@ func (s *AccountService) LinkItem(ctx context.Context, tenantID uuid.UUID, publi
 	}
 
 	if err := s.itemRepo.Create(ctx, item); err != nil {
+		if errors.Is(err, ports.ErrItemAlreadyExists) {
+			slog.Info("item already exists, fetching existing", "plaid_item_id", tokenResp.ItemID)
+			
+			// fetch existing item (makes operation idempotent)
+			existingItem, fetchErr := s.itemRepo.GetByPlaidItemID(ctx, tokenResp.ItemID)
+			if fetchErr != nil {
+				return uuid.Nil, fmt.Errorf("item exists but failed to fetch: %w", fetchErr)
+			}
+			
+			return existingItem.ID, ErrItemAlreadyLinked
+		}
 		return uuid.Nil, fmt.Errorf("failed to save item: %w", err)
 	}
 
@@ -57,5 +76,6 @@ func (s *AccountService) LinkItem(ctx context.Context, tenantID uuid.UUID, publi
 		slog.Error("failed to enqueue initial sync", "item_id", itemID, "error", err)
 	}
 
+	slog.Info("item linked successfully", "item_id", itemID, "plaid_item_id", tokenResp.ItemID)
 	return itemID, nil
 }

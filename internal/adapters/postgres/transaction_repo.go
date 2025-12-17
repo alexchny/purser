@@ -7,7 +7,6 @@ import (
 
 	"github.com/alexchny/sync-relay/internal/domain"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 type TransactionRepo struct {
@@ -98,7 +97,7 @@ func (r *TransactionRepo) MarkRemovedBatch(ctx context.Context, itemID uuid.UUID
 		WHERE item_id = $1 AND plaid_transaction_id = ANY($2)
 	`
 
-	if _, err := r.db.ExecContext(ctx, query, itemID, pq.Array(plaidTxIDs)); err != nil {
+	if _, err := r.db.ExecContext(ctx, query, itemID, plaidTxIDs); err != nil {
 		return fmt.Errorf("failed to mark removed: %w", err)
 	}
 

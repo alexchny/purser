@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/alexchny/sync-relay/internal/api"
 	"github.com/alexchny/sync-relay/internal/service"
-	"github.com/google/uuid"
 )
 
 type AccountHandler struct {
@@ -24,9 +24,13 @@ func (h *AccountHandler) CreateLinkToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	userID := "00000000-0000-0000-0000-000000000001"
+	userID, ok := api.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
-	token, err := h.service.CreateLinkToken(r.Context(), userID)
+	token, err := h.service.CreateLinkToken(r.Context(), userID.String())
 	if err != nil {
 		slog.Error("failed to create link token", "user_id", userID, "error", err)
 		http.Error(w, "failed to create link token", http.StatusInternalServerError)
@@ -58,7 +62,11 @@ func (h *AccountHandler) ConnectItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	tenantID, ok := api.GetTenantID(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	itemID, err := h.service.LinkItem(r.Context(), tenantID, req.PublicToken)
 	if err != nil {

@@ -32,7 +32,7 @@ func (h *WebhookHandler) HandlePlaidWebhook(w http.ResponseWriter, r *http.Reque
 	payload, err := h.verifier.VerifyWebhook(r.Context(), r)
 	if err != nil {
 		slog.Warn("invalid webhook attempt", "error", err, "ip", r.RemoteAddr)
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 

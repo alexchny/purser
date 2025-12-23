@@ -14,6 +14,7 @@ import (
 	"github.com/alexchny/sync-relay/internal/adapters/plaid"
 	"github.com/alexchny/sync-relay/internal/adapters/postgres"
 	"github.com/alexchny/sync-relay/internal/adapters/redis"
+	"github.com/alexchny/sync-relay/internal/api"
 	"github.com/alexchny/sync-relay/internal/api/handlers"
 	"github.com/alexchny/sync-relay/internal/config"
 	"github.com/alexchny/sync-relay/internal/service"
@@ -91,7 +92,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.ServerPort),
-		Handler:      mux,
+		Handler:      api.AuthMiddleware(mux),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  15 * time.Second,
